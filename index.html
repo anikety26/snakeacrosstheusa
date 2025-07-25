@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Snake Across the United States</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .info {
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      margin: 5px 5px 0 0;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .option {
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .crash-message {
+      background-color: #ffdddd;
+      color: #a30000;
+      padding: 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    }
+    .challenge-label {
+      display: inline-block;
+      margin-left: 10px;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.9em;
+      font-weight: bold;
+      background-color: red;
+      color: white;
+    }
+    .crash-warning {
+      background-color: #ff4444;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.8em;
+      margin-left: 10px;
+    }
+    #challengeActions {
+      margin-top: 10px;
+    }
+    #backButton {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background-color: #666;
+      color: white;
+      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+    #backButton:hover {
+      background-color: #444;
+    }
+    #startScreen {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.15);
+      max-width: 400px;
+      margin: 100px auto;
+      text-align: center;
+    }
+    #totalDistanceDisplay {
+      font-size: 1.2em;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="startScreen">
+    <h2>Select Starting Location</h2>
+    <select id="startingCitySelect"></select><br><br>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+
+  <div id="mainUI" style="display: none;">
+    <div id="totalDistanceDisplay">Total Distance: 0 miles</div>
+
+    <div class="info">
+      <h2>
+        Current Location: 
+        <span id="currentLocation"></span>
+        <span id="currentChallengeLabel"></span>
+      </h2>
+      <button onclick="toggleChallengeForm()">Add Roadblock or Battle Challenge</button>
+    </div>
+
+    <div id="challengeForm" style="display:none; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px;">
+      <label>Type:
+        <select id="challengeType">
+          <option value="Roadblock">Roadblock</option>
+          <option value="Battle Challenge">Battle Challenge</option>
+        </select>
+      </label>
+      <label>City:
+        <select id="challengeCity"></select>
+      </label>
+      <button onclick="addChallenge()">Add</button>
+    </div>
+
+    <div id="challengeActions"></div>
+    <div id="optionsContainer"></div>
+    <button id="backButton" onclick="goBack()">↩️ Back</button>
+  </div>
+
+  <script>
+    const mapGraph = {
+  "Seattle": [
+    { city: "Portland", distance: 174, driveTime: "2h 45m" },
+    { city: "Billings", distance: 750, driveTime: "11h 0m" },
+    { city: "Bellingham", distance: 0, driveTime: "1h 45m" }
+  ],
+  "Portland": [
+    { city: "Seattle", distance: 174, driveTime: "2h 45m" },
+    { city: "San Francisco", distance: 635, driveTime: "9h 30m" },
+    { city: "Billings", distance: 820, driveTime: "12h 0m" }
+  ],
+  "San Francisco": [
+    { city: "Los Angeles", distance: 380, driveTime: "5h 45m" },
+    { city: "Portland", distance: 635, driveTime: "9h 30m" },
+    { city: "Las Vegas", distance: 560, driveTime: "8h 30m" }
+  ],
+  "Los Angeles": [
+    { city: "San Francisco", distance: 380, driveTime: "5h 45m" },
+    { city: "Las Vegas", distance: 270, driveTime: "4h 0m" },
+    { city: "Phoenix", distance: 370, driveTime: "5h 30m" },
+    { city: "San Diego", distance: 0, driveTime: "1h 45m" }
+  ],
+  "Las Vegas": [
+    { city: "Los Angeles", distance: 270, driveTime: "4h 0m" },
+    { city: "Phoenix", distance: 290, driveTime: "4h 30m" },
+    { city: "San Francisco", distance: 560, driveTime: "8h 30m" },
+    { city: "Denver", distance: 755, driveTime: "11h 15m" }
+  ],
+  "Phoenix": [
+    { city: "Los Angeles", distance: 370, driveTime: "5h 30m" },
+    { city: "Las Vegas", distance: 290, driveTime: "4h 30m" },
+    { city: "Albuquerque", distance: 470, driveTime: "7h 0m" },
+    { city: "El Paso", distance: 430, driveTime: "6h 30m" }
+  ],
+  "Billings": [
+    { city: "Seattle", distance: 750, driveTime: "11h 0m" },
+    { city: "Portland", distance: 820, driveTime: "12h 0m" },
+    { city: "Denver", distance: 554, driveTime: "8h 30m" },
+    { city: "Fargo", distance: 609, driveTime: "9h 0m" }
+  ],
+  "Denver": [
+    { city: "Albuquerque", distance: 450, driveTime: "6h 30m" },
+    { city: "Wichita", distance: 490, driveTime: "7h 30m" },
+    { city: "Billings", distance: 554, driveTime: "8h 30m" },
+    { city: "Las Vegas", distance: 755, driveTime: "11h 15m" }
+  ],
+  "Albuquerque": [
+    { city: "Phoenix", distance: 470, driveTime: "7h 0m" },
+    { city: "Denver", distance: 450, driveTime: "6h 30m" },
+    { city: "El Paso", distance: 265, driveTime: "4h 0m" },
+    { city: "Oklahoma City", distance: 570, driveTime: "9h 0m" }
+  ],
+  "El Paso": [
+    { city: "Albuquerque", distance: 265, driveTime: "4h 0m" },
+    { city: "Phoenix", distance: 430, driveTime: "6h 30m" },
+    { city: "San Antonio", distance: 550, driveTime: "8h 0m" },
+    { city: "Fort Worth", distance: 644, driveTime: "12h 10m" }
+  ],
+  "San Antonio": [
+    { city: "Houston", distance: 185, driveTime: "2h 40m" },
+    { city: "El Paso", distance: 550, driveTime: "8h 0m" },
+    { city: "Fort Worth", distance: 270, driveTime: "4h 0m" },
+    { city: "McAllen", distance: 0, driveTime: "3h 0m" }
+  ],
+  "Houston": [
+    { city: "Dallas", distance: 240, driveTime: "3h 40m" },
+    { city: "San Antonio", distance: 185, driveTime: "2h 40m" },
+    { city: "New Orleans", distance: 350, driveTime: "5h 0m" },
+    { city: "Corpus Christi", distance: 0, driveTime: "2h 30m" }
+  ],
+  "Fort Worth": [
+    { city: "Dallas", distance: 33, driveTime: "0h 40m" },
+    { city: "Oklahoma City", distance: 180, driveTime: "2h 50m" },
+    { city: "San Antonio", distance: 270, driveTime: "4h 0m" },
+    { city: "El Paso", distance: 644, driveTime: "12h 10m" }
+  ],
+  "Dallas": [
+    { city: "Fort Worth", distance: 33, driveTime: "0h 40m" },
+    { city: "Oklahoma City", distance: 200, driveTime: "3h 0m" },
+    { city: "Houston", distance: 240, driveTime: "3h 40m" },
+    { city: "Memphis", distance: 470, driveTime: "8h 0m" }
+  ],
+  "Oklahoma City": [
+    { city: "Kansas City", distance: 350, driveTime: "5h 15m" },
+    { city: "Wichita", distance: 160, driveTime: "2h 30m" },
+    { city: "Dallas", distance: 200, driveTime: "3h 0m" },
+    { city: "Fort Worth", distance: 180, driveTime: "2h 50m" },
+    { city: "Albuquerque", distance: 570, driveTime: "9h 0m" }
+  ],
+  "Wichita": [
+    { city: "Kansas City", distance: 190, driveTime: "3h 0m" },
+    { city: "Oklahoma City", distance: 160, driveTime: "2h 30m" },
+    { city: "Denver", distance: 490, driveTime: "7h 30m" },
+    { city: "Omaha", distance: 260, driveTime: "4h 0m" }
+  ],
+  "Kansas City": [
+    { city: "Omaha", distance: 185, driveTime: "2h 50m" },
+    { city: "Wichita", distance: 190, driveTime: "3h 0m" },
+    { city: "Oklahoma City", distance: 350, driveTime: "5h 15m" },
+    { city: "Jefferson City", distance: 125, driveTime: "2h 0m" }
+  ],
+  "Omaha": [
+    { city: "Fargo", distance: 423, driveTime: "6h 20m" },
+    { city: "Kansas City", distance: 185, driveTime: "2h 50m" },
+    { city: "Wichita", distance: 260, driveTime: "4h 0m" },
+    { city: "Des Moines", distance: 135, driveTime: "2h 0m" }
+  ],
+  "Fargo": [
+    { city: "Minneapolis", distance: 230, driveTime: "3h 30m" },
+    { city: "Omaha", distance: 423, driveTime: "6h 20m" },
+    { city: "Billings", distance: 609, driveTime: "9h 0m" },
+    { city: "Grand Forks", distance: 0, driveTime: "1h 15m" }
+  ],
+  "Minneapolis": [
+    { city: "Fargo", distance: 230, driveTime: "3h 30m" },
+    { city: "Des Moines", distance: 240, driveTime: "3h 45m" },
+    { city: "Chicago", distance: 400, driveTime: "6h 0m" },
+    { city: "Duluth", distance: 0, driveTime: "2h 30m" }
+  ],
+  "Des Moines": [
+    { city: "Omaha", distance: 135, driveTime: "2h 0m" },
+    { city: "Minneapolis", distance: 240, driveTime: "3h 45m" },
+    { city: "Chicago", distance: 330, driveTime: "5h 0m" },
+    { city: "Jefferson City", distance: 257, driveTime: "5h 10m" }
+  ],
+  "Jefferson City": [
+    { city: "St. Louis", distance: 125, driveTime: "2h 0m" },
+    { city: "Kansas City", distance: 125, driveTime: "2h 0m" },
+    { city: "Des Moines", distance: 257, driveTime: "5h 10m" },
+    { city: "Memphis", distance: 350, driveTime: "5h 30m" }
+  ],
+  "Memphis": [
+    { city: "Dallas", distance: 470, driveTime: "8h 0m" },
+    { city: "Nashville", distance: 210, driveTime: "3h 15m" },
+    { city: "New Orleans", distance: 400, driveTime: "6h 0m" },
+    { city: "Jefferson City", distance: 350, driveTime: "5h 30m" }
+  ],
+  "New Orleans": [
+    { city: "Houston", distance: 350, driveTime: "5h 0m" },
+    { city: "Memphis", distance: 400, driveTime: "6h 0m" },
+    { city: "Jacksonville", distance: 546, driveTime: "8h 0m" }
+  ],
+  "Atlanta": [
+    { city: "Charlotte", distance: 245, driveTime: "3h 40m" },
+    { city: "Nashville", distance: 250, driveTime: "3h 45m" },
+    { city: "Jacksonville", distance: 346, driveTime: "5h 5m" },
+    { city: "New Orleans", distance: 470, driveTime: "7h 0m" }
+  ],
+  "Nashville": [
+    { city: "Columbus", distance: 402, driveTime: "8h 5m" },
+    { city: "Atlanta", distance: 250, driveTime: "3h 45m" },
+    { city: "Memphis", distance: 210, driveTime: "3h 15m" },
+    { city: "St. Louis", distance: 300, driveTime: "4h 45m" }
+  ],
+  "St. Louis": [
+    { city: "Chicago", distance: 300, driveTime: "4h 30m" },
+    { city: "Jefferson City", distance: 125, driveTime: "2h 0m" },
+    { city: "Detroit", distance: 550, driveTime: "8h 0m" },
+    { city: "Nashville", distance: 300, driveTime: "4h 45m" }
+  ],
+  "Chicago": [
+    { city: "Des Moines", distance: 330, driveTime: "5h 0m" },
+    { city: "Minneapolis", distance: 400, driveTime: "6h 0m" },
+    { city: "St. Louis", distance: 300, driveTime: "4h 30m" },
+    { city: "Marquette", distance: 0, driveTime: "7h 0m" }
+  ],
+  "Detroit": [
+    { city: "St. Louis", distance: 550, driveTime: "8h 0m" },
+    { city: "Columbus", distance: 187, driveTime: "3h 40m" },
+    { city: "Grand Rapids", distance: 0, driveTime: "2h 45m" },
+    { city: "Traverse City", distance: 0, driveTime: "4h 15m" }
+  ],
+  "Columbus": [
+    { city: "New York City", distance: 530, driveTime: "8h 0m" },
+    { city: "Detroit", distance: 187, driveTime: "3h 40m" },
+    { city: "Nashville", distance: 402, driveTime: "8h 5m" },
+    { city: "Charlotte", distance: 544, driveTime: "8h 30m" }
+  ],
+  "Jacksonville": [
+    { city: "Charlotte", distance: 385, driveTime: "6h 0m" },
+    { city: "Atlanta", distance: 346, driveTime: "5h 5m" },
+    { city: "New Orleans", distance: 546, driveTime: "8h 0m" }
+  ],
+  "Charlotte": [
+    { city: "New York City", distance: 644, driveTime: "10h 0m" },
+    { city: "Columbus", distance: 544, driveTime: "8h 30m" },
+    { city: "Atlanta", distance: 245, driveTime: "3h 40m" },
+    { city: "Jacksonville", distance: 385, driveTime: "6h 0m" }
+  ],
+  "New York City": [
+    { city: "Columbus", distance: 530, driveTime: "8h 0m" },
+    { city: "Charlotte", distance: 644, driveTime: "10h 0m" },
+    { city: "Portland", distance: 0, driveTime: "5h 15m" },
+    { city: "Buffalo", distance: 0, driveTime: "6h 0m" },
+    { city: "Burlington", distance: 0, driveTime: "5h 45m" }
+  ]
+};
+
+    let currentLocation = null;
+    let visitedCities = new Set();
+    let totalDistance = 0;
+    let challenges = [];
+    let historyStack = [];
+
+    const startCitySelect = document.getElementById('startingCitySelect');
+    for (const city of Object.keys(mapGraph)) {
+      const option = document.createElement('option');
+      option.value = city;
+      option.textContent = city;
+      startCitySelect.appendChild(option);
+    }
+
+    function startGame() {
+      currentLocation = startCitySelect.value;
+      visitedCities = new Set([currentLocation]);
+      totalDistance = 0;
+      challenges = [];
+      historyStack = [];
+
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('mainUI').style.display = 'block';
+
+      updateUI();
+      populateChallengeCitySelect();
+      updateChallengeLabel();
+
+      const challenge = challenges.find(c => c.city === currentLocation);
+      if (challenge) showChallenge(challenge);
+    }
+
+    function updateUI() {
+      document.getElementById('currentLocation').textContent = currentLocation;
+      document.getElementById('totalDistanceDisplay').textContent = `Total Distance: ${totalDistance} miles`;
+
+      const optionsContainer = document.getElementById('optionsContainer');
+      optionsContainer.innerHTML = '';
+
+      const currentChallenge = challenges.find(c => c.city === currentLocation);
+      const challengeActive = document.getElementById('challengeActions').innerHTML.trim() !== '';
+
+      if (mapGraph[currentLocation].length === 0) {
+        optionsContainer.textContent = "No more cities to travel to.";
+        return;
+      }
+
+      for (const option of mapGraph[currentLocation]) {
+        const optionDiv = document.createElement('div');
+        optionDiv.classList.add('option');
+
+        let cityName = option.city;
+        const warnings = [];
+
+        if (visitedCities.has(option.city)) warnings.push('CRASH!');
+        if (option.distance === 0) warnings.push('CRASH!');
+
+        const challenge = challenges.find(c => c.city === option.city);
+        if (challenge && (challenge.type === 'Roadblock' || challenge.type === 'Battle Challenge')) {
+          warnings.push(`${challenge.type} Ahead`);
+        }
+
+        let cityHTML = `<strong>${cityName}</strong>`;
+        for (const warning of warnings) {
+          cityHTML += `<span class="crash-warning">${warning}</span>`;
+        }
+
+        const isDisabled = challengeActive ? 'disabled title="Resolve current challenge first."' : '';
+
+        optionDiv.innerHTML = `
+          <div>
+            ${cityHTML}<br />
+            Distance: ${option.distance} miles, Drive time: ${option.driveTime}
+          </div>
+          <button onclick="travelToCity('${option.city}', ${option.distance})" ${isDisabled}>Go</button>
+        `;
+
+        optionsContainer.appendChild(optionDiv);
+      }
+    }
+
+    function travelToCity(city, distance) {
+      const currentChallenge = challenges.find(c => c.city === currentLocation);
+      const challengeActive = document.getElementById('challengeActions').innerHTML.trim() !== '';
+
+      if (currentChallenge && challengeActive) {
+        alert('You must complete or fail the current challenge before continuing.');
+        return;
+      }
+
+      if (visitedCities.has(city) || distance === 0) {
+        totalDistance += distance;
+        updateTotalDistanceDisplay();
+        crashGame(city, distance);
+        return;
+      }
+
+      historyStack.push({
+        currentLocation,
+        visitedCities: new Set(visitedCities),
+        totalDistance,
+        challenges: JSON.parse(JSON.stringify(challenges))
+      });
+
+      currentLocation = city;
+      visitedCities.add(city);
+      totalDistance += distance;
+      updateTotalDistanceDisplay();
+
+      const challenge = challenges.find(c => c.city === city);
+      if (challenge) {
+        showChallenge(challenge);
+      } else {
+        document.getElementById('challengeActions').innerHTML = '';
+      }
+
+      updateUI();
+      updateChallengeLabel();
+      populateChallengeCitySelect();
+    }
+
+    function updateTotalDistanceDisplay() {
+      document.getElementById('totalDistanceDisplay').textContent = `Total Distance: ${totalDistance} miles`;
+    }
+
+    function crashGame(city, distance) {
+      document.getElementById('optionsContainer').innerHTML = '';
+      document.getElementById('challengeActions').innerHTML = '';
+      document.getElementById('currentChallengeLabel').textContent = '';
+
+      const crashHTML = `
+        <div class="crash-message">
+          CRASH! 
+          Total Distance Travelled: <strong>${totalDistance}</strong> miles.
+          <br /><br />
+          <button onclick="restartGame()">Restart Game</button>
+        </div>
+      `;
+      document.getElementById('optionsContainer').innerHTML = crashHTML;
+    }
+
+    function restartGame() {
+      location.reload();
+    }
+
+    function toggleChallengeForm() {
+      const form = document.getElementById('challengeForm');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function populateChallengeCitySelect() {
+      const challengeCitySelect = document.getElementById('challengeCity');
+      challengeCitySelect.innerHTML = '';
+      for (const city of Object.keys(mapGraph)) {
+        const option = document.createElement('option');
+        option.value = city;
+        option.textContent = city;
+        challengeCitySelect.appendChild(option);
+      }
+    }
+
+    function addChallenge() {
+      const type = document.getElementById('challengeType').value;
+      const city = document.getElementById('challengeCity').value;
+
+      if (challenges.find(c => c.city === city)) {
+        alert('Challenge already exists for that city.');
+        return;
+      }
+
+      challenges.push({ city, type });
+      alert(`${type} challenge added for ${city}`);
+
+      toggleChallengeForm();
+      updateChallengeLabel();
+      updateUI(); // live update of option warnings
+    }
+
+    function updateChallengeLabel() {
+      const labelSpan = document.getElementById('currentChallengeLabel');
+      const challenge = challenges.find(c => c.city === currentLocation);
+      labelSpan.innerHTML = challenge ? `<span class="challenge-label">${challenge.type}</span>` : '';
+    }
+
+    function showChallenge(challenge) {
+      const challengeActions = document.getElementById('challengeActions');
+      if (challenge.type === 'Roadblock') {
+        challengeActions.innerHTML = `
+          <p><strong>Roadblock Challenge!</strong> You must answer correctly or be sent back to your previous city.</p>
+          <button onclick="passChallenge()">Pass Challenge</button>
+          <button onclick="failChallenge()">Fail Challenge</button>
+        `;
+      } else if (challenge.type === 'Battle Challenge') {
+        challengeActions.innerHTML = `
+          <p><strong>Battle Challenge!</strong> Win or lose a battle to continue.</p>
+          <button onclick="passChallenge()">Win Battle</button>
+          <button onclick="failChallenge()">Lose Battle</button>
+        `;
+      }
+    }
+
+    function passChallenge() {
+      document.getElementById('challengeActions').innerHTML = '';
+      updateUI(); // re-enable travel
+    }
+
+   function failChallenge() {
+  const challenge = challenges.find(c => c.city === currentLocation);
+  const message = challenge ? `${challenge.type} failed in ${currentLocation}` : 'Challenge failed.';
+
+  document.getElementById('optionsContainer').innerHTML = '';
+  document.getElementById('challengeActions').innerHTML = '';
+  document.getElementById('currentChallengeLabel').textContent = '';
+
+  const crashHTML = `
+    <div class="crash-message">
+      CRASH! ${message}.<br />
+      Total Distance Travelled: <strong>${totalDistance}</strong> miles.
+      <br /><br />
+      <button onclick="restartGame()">Restart Game</button>
+    </div>
+  `;
+  document.getElementById('optionsContainer').innerHTML = crashHTML;
+}
+
+
+    function goBack() {
+      if (historyStack.length === 0) {
+        alert('No previous move to go back to.');
+        return;
+      }
+      const prevState = historyStack.pop();
+      currentLocation = prevState.currentLocation;
+      visitedCities = prevState.visitedCities;
+      totalDistance = prevState.totalDistance;
+      challenges = prevState.challenges;
+
+      updateTotalDistanceDisplay();
+      updateUI();
+      updateChallengeLabel();
+      document.getElementById('challengeActions').innerHTML = '';
+    }
+  </script>
+</body>
+</html>
